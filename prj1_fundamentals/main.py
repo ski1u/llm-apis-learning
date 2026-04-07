@@ -51,15 +51,19 @@ class Conversation:
             types.Content(role=role, parts=[types.Part(text=content)])
         )
 
-    def chat(self, user_msg: str,
-        # system_instruction: str
-    ) -> str:
+    def chat(self, user_msg: str) -> str:
         self.append_history(role="user", content=user_msg)
 
         response = client.models.generate_content(
-            model=model, config=config,
+            model=model,
+            config=types.GenerateContentConfig(
+                system_instruction=self.system,
+                    max_output_tokens=1024, temperature=0.6,
+                    response_mime_type="text/plain",
+                    thinking_config=types.ThinkingConfig(thinking_budget=320),
+            ),
             contents=self.history
-        ); reply = response.text; usage = response.usuage_metadata
+        ); reply = response.text; usage = response.usage_metadata
         turn_tokens = (usage.prompt_token_count or 0) + (usage.candidates_token_count or 0)
 
         self.append_history(role="model", content=reply)
@@ -71,8 +75,33 @@ class Conversation:
     def show_history(self) -> None:
         print("History:")
         for msg in self.history:
+            limit = 40
             text = msg.parts[0].text
-            preview = text[:40] + "..." if len(text) > 40 else text
+            preview = text[:limit] + "..." if len(text) > limit else text
 
             print(f"{msg.role.upper()}: {preview}")
         print()
+
+gemini = Conversation(system="You are a helpful assistant that will aid in user's requests")
+# print(gemini.chat(user_msg="Define antiderivates in 2 sentences."))
+# print(gemini.chat(user_msg="Give me an example."))
+# ... continue chatting
+# gemini.show_history()
+
+# ---
+
+# 3 Persona test
+ps = [
+    Conversation(system="You are an assistant that helps people write creative stories"),
+    Conversation(system="You are a personal trainer that helps people make workout routines"),
+    Conversation(system="You help people write code that fulfills the user's request")
+]
+
+# for i, p in enumerate(ps):
+#     print(f"""
+#     Persona-{i+1}:
+#     {p.chat(user_msg="What are some ways to better my well-being?")}
+#     """)
+    # Reflection: despite all models having the same system_instruct,
+    # they all fulfilled the user's request without making their instructions relevant,
+    # bypassing their instructions and not sticking with it.
